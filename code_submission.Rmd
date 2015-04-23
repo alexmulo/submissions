@@ -1,0 +1,70 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Alessandro Capuani"
+date: "21/04/2015"
+output: html_document
+---
+
+
+
+Train and test data sets were loaded and pre-processed to remove unuseful predictors, e.g. only containing NA or with zero variance.
+The variable
+```{r}
+library(caret)
+data_r <- read.table('pml-training.csv',header=T,row.names=1,sep=",")
+```
+The variables "user_name","raw_timestamp_part_1","raw_timestamp_part_2" and "cvtd_timestamp" were also removed, since they do not have any
+influence on the response variable "classe", as shown below.
+```{r}
+featurePlot(x=data_r[,c("user_name","raw_timestamp_part_1",
+                       "raw_timestamp_part_2",
+                       "cvtd_timestamp","classe")],y=data_r$classe,
+                        plot="pairs")
+```
+
+
+The function nearZeroVar from the caret package was used to detect variables with zero or near zero variance. Finally, after pre-processing
+53 predictors were retained for train and test data sets, without considering the response variable.
+```{r}
+data_filtered <- data_r[,colSums(is.na(data_r)) == 0]
+nzv <- nearZeroVar(data_filtered, saveMetrics= FALSE)
+data_filtered <- data_filtered[,-nzv]
+data_filtered <- data_filtered[,-c(1:4)]
+
+test <- read.table('pml-testing.csv',header=T,row.names=1,sep=",")
+test_filtered <-test[,colnames(data_filtered[,1:53])]
+dim(data_filtered)
+dim(test_filtered)
+```
+
+The train data set was splitted in two parts, training and validation data sets. The latest will be used to validate our model.
+```{r}
+trainIndex <- createDataPartition(data_filtered$classe, p = .8,
+                                  list = FALSE,
+                                  times = 1)
+
+training <-data_filtered[trainIndex,]
+validation <-data_filtered[-trainIndex,]
+```
+
+Random forest was use as model due to its high accuracy. A cross validation with 3 folds was applied as resampling method. A seed was set because of the randomization reproducibility. The trained model showed a very high accuracy, as also displayed in the output below.
+```{r}
+set.seed(3254)
+fitControl <- trainControl(## 3-fold CV
+                           method = "cv",
+                           number = 3,
+                           ## repeated ten times
+                           repeats = 3,
+                           verboseIter = FALSE)
+
+modelFit_RF <-train(classe ~.,data=training,method="rf",trControl = fitControl,verbose=T)
+modelFit_RF
+```
+Moreover, also using the validation set, it is possible to see that the error within the categories very low is.
+```{r}
+pred <-predict(modelFit_RF,validation[,1:53])
+known <-validation$classe
+table(pred,known)
+```
+Thanks to wugulino at inf dot puc-rio dot br to share their data set-
+
